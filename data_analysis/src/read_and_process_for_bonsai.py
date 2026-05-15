@@ -33,7 +33,7 @@ parts = str(args.parts)
 charge = args.chargeCut
 
 # READ RAW DATA
-run_files  = sort_run_files(f"/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/raw_data/{run}/WCTE_offline_R{run}S*P*.root")
+run_files  = sort_run_files(f"/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/raw_data/production_v0/{run}/WCTE_offline_R{run}S*P*.root")
 part_files = get_part_files(run_files)
 if parts == "all":
     part_files = part_files
@@ -226,7 +226,7 @@ else:
 print(f"Total hits: {len(data)}, selected hits: {len(charge_filtered_data)}")
 
 print("+---------------------------------------+")
-print(f"+                Run {run}              +")
+print(f"+                Run {run}             +")
 print("+ Data Manipulation And Filtering Done! +")
 print("+        Let's Start With BONSAI        +")
 print("+---------------------------------------+")

@@ -21,7 +21,7 @@ def remove_spill(trigger_indices, run_times):
 
     return ak.Array(corrected_run_times)
 
-def nHits(mode, hit_times, w, thresh_min, thresh_max, pre_window, post_window, jump, event=0, progress_bar=True):
+def spillnHits(mode, hit_times, w, thresh_min, thresh_max, pre_window, post_window, jump, event=0, progress_bar=True):
     def process_event(ht, w, thresh_min, thresh_max, pre_window, post_window, jump):
         if len(ht) == 0:
             return [], []
@@ -116,6 +116,168 @@ def nHits(mode, hit_times, w, thresh_min, thresh_max, pre_window, post_window, j
     else:
         print("enter a valid mode name")
         return {}, {}
+
+def candidatenHits(mode,
+          hit_times,
+          w,
+          thresh_min,
+          thresh_max,
+          pre_window,
+          post_window,
+          jump,
+          event=0,
+          progress_bar=True):
+
+    def process_event(ht,
+                      w,
+                      thresh_min,
+                      thresh_max,
+                      pre_window,
+                      post_window,
+                      jump):
+
+        if len(ht) == 0:
+            return [], [], [], []
+
+        # Orden temporal
+        ht = np.sort(ht)
+
+        # ------------------------
+        # Sliding window trigger
+        # ------------------------
+
+        ends = ht + w
+        right = np.searchsorted(ht, ends, side="left")
+        left = np.arange(len(ht))
+        counts = right - left
+
+        trigger_indices = np.where(counts >= thresh_min)[0]
+
+        triggered_hits_index = []
+        triggered_hits_time = []
+
+        trigger_seeds = []      # t_seed (paper SLE crossing)
+        roi_start_times = []   # primer hit físico del cluster
+
+        last_cluster_end = -np.inf
+
+        # ------------------------
+        # Loop triggers
+        # ------------------------
+
+        for idx in trigger_indices:
+
+            t_seed = ht[idx]
+
+            # Deadtime basado en CLUSTER REAL
+            if t_seed < last_cluster_end + jump:
+                continue
+
+            # ------------------------
+            # ROI física
+            # ------------------------
+
+            t_min = t_seed - pre_window
+            t_max = t_seed + w + post_window
+
+            roi_mask = (ht >= t_min) & (ht <= t_max)
+            indices_roi = np.where(roi_mask)[0]
+
+            if len(indices_roi) < thresh_min:
+                continue
+            
+            if thresh_max is not None and len(indices_roi) > thresh_max:
+                continue
+
+            hit_times_roi = ht[indices_roi]
+
+            # ------------------------
+            # Guardado
+            # ------------------------
+
+            triggered_hits_index.append(indices_roi)
+            triggered_hits_time.append(hit_times_roi)
+
+            trigger_seeds.append(t_seed)
+            roi_start_times.append(hit_times_roi[0])
+
+            # Deadtime real: fin del cluster físico
+            last_cluster_end = hit_times_roi[-1]
+
+        return triggered_hits_index, triggered_hits_time, trigger_seeds, roi_start_times
+
+    # ==================================================
+    # SINGLE EVENT
+    # ==================================================
+
+    if mode == "single_event":
+
+        ht = ak.to_numpy(hit_times[event])
+
+        idxs, times, seeds, roi_starts = process_event(
+            ht,
+            w,
+            thresh_min,
+            thresh_max,
+            pre_window,
+            post_window,
+            jump
+        )
+
+        return ({event: idxs},
+                {event: times},
+                {event: seeds},
+                {event: roi_starts})
+
+    # ==================================================
+    # MULTIPLE EVENTS
+    # ==================================================
+
+    elif mode == "multiple_events":
+
+        nevents = len(hit_times)
+
+        triggered_hits_index = {}
+        triggered_hits_time = {}
+        trigger_seeds_dict = {}
+        roi_start_times_dict = {}
+
+        for event in tqdm(range(nevents),
+                          total=nevents,
+                          leave=progress_bar):
+
+            ht = ak.to_numpy(hit_times[event])
+
+            if len(ht) == 0:
+                triggered_hits_index[event] = []
+                triggered_hits_time[event] = []
+                trigger_seeds_dict[event] = []
+                roi_start_times_dict[event] = []
+                continue
+
+            idxs, times, seeds, roi_starts = process_event(
+                ht,
+                w,
+                thresh_min,
+                thresh_max,
+                pre_window,
+                post_window,
+                jump
+            )
+
+            triggered_hits_index[event] = idxs
+            triggered_hits_time[event] = times
+            trigger_seeds_dict[event] = seeds
+            roi_start_times_dict[event] = roi_starts
+
+        return (triggered_hits_index,
+                triggered_hits_time,
+                trigger_seeds_dict,
+                roi_start_times_dict)
+
+    else:
+        print("enter a valid mode name")
+        return {}, {}, {}, {}
 
 def select_signal_clusters(triggered_hit_times, triggered_hit_indices, trms_cut_inf, trms_cut_sup, noHits_cut_inf, noHits_cut_sup):
     signal_clusters = []

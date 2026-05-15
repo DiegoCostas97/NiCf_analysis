@@ -1,26 +1,13 @@
-#%%
-import sys
-import os
 
-# Añade el directorio padre al sys.path
-sys.path.append(os.path.abspath("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk"))
-
-# ROOT!
-import os, sys
-os.environ["ROOTSYS"]   = "/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/ROOT/ROOT_6.26.14/install"
-os.environ["BONSAIDIR"] = "/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/hk-BONSAI"
-os.environ["WCSIM_BUILD_DIR"] = "/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/WCSim/install/"
-sys.path.append(os.path.join(os.environ["ROOTSYS"], "lib"))
-sys.path.append(os.path.join(os.environ["BONSAIDIR"], "lib"))
-sys.path.append(os.path.join(os.environ["WCSIM_BUILD_DIR"], "lib"))
-
-import ROOT
-
-import uproot
+import ROOT 
 import glob 
+import numpy as np 
+import pandas as pd 
+import sys 
 import array
+import pandas as pd
+import os
 import cppyy
-import argparse
 
 cppyy.add_include_path("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/WCSim/install/include")
 cppyy.load_library("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/WCSim/install/lib/libWCSimRoot.so")
@@ -28,13 +15,6 @@ cppyy.load_library("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/WCSim/ins
 cppyy.add_include_path("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/hk-BONSAI/bonsai")
 cppyy.load_library("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/hk-BONSAI/libWCSimBonsai.so")
 
-
-import numpy  as np
-import pandas as pd
-
-from tqdm import tqdm
-
-# DEFINE FUNCTIONS
 def get_offline_run_files(run, base="/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/raw_data"):
     files = glob.glob(f"{base}/{run}/WCTE_offline_R*.root")
     return files
@@ -51,7 +31,7 @@ def get_offline_run_tchain(run, limit=0):
 
 # Function to load geometry mapping from a text file
 def get_geo_mapping():
-    geo = pd.read_csv("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/WCSim/install/geofile_NuPRISMBeamTest_16cShort_mPMT.txt", 
+    geo = pd.read_csv("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk/WCSim/build/mydir/geofile_NuPRISMBeamTest_16cShort_mPMT.txt", 
                       index_col=False,      # Do not use any column as the index
                       sep='\s+',            # Use whitespace as separator
                       skiprows=5,           # Skip the first 5 header lines
@@ -81,6 +61,7 @@ def getxyz(geo, mpmtids, posids):
     x, y, z, c = map(np.array, zip(*results))
 
     return x, y, z, c
+
 
 # Simple class to store a filtered time slice of hit data
 class hit_slice:
@@ -165,29 +146,20 @@ class hit_collection:
         h.t     = h.t[ tsel ]      
 
         return h  # Return the filtered slice
-
-#%%
-# VARIABLES AND SETTING UP
-parser = argparse.ArgumentParser()
-parser.add_argument("--run", type=str, required=True, help="Run Number")
-args = parser.parse_args()
-
-runno = args.run
-min_charge = 500
-max_charge = 12500
-
-# output_dir = f"/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/nicf_data/bonsai/testWithoutTOF_{runno}_vertexBONSAI.csv"
-output_dir = f"/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/nicf_data/bonsai/vertex_{runno}_separated_chargeFiltered{min_charge}-{max_charge}REVISIT.csv"
+    
+# Load the geometry mapping into a DataFrame
+runno = int(sys.argv[1])
+# ROOT Input
+# tt    = get_offline_run_tchain(runno)
 
 # DF Input
-# data   = pd.read_csv(f"/home/usc/ie/dcr/hk/nicf_analysis/data_analysis/NB/data_files/testWithoutTOF_{runno}.csv")
-data   = pd.read_csv(f"/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/nicf_data/data/run_{runno}_forBONSAI_separated_chargeFiltered{min_charge}-{max_charge}.csv")
+data   = pd.read_csv("../df_unfiltered_1767.csv", index_col=0)
 events = np.unique(data["event_id"])
     
-#%%
 # Setup HKBONSAI with WCTE geo
-simfile = ROOT.TFile("/home/usc/ie/dcr/hk/nicf_analysis/bonsai_reco/bonsai_reqs/wcsim.root")
+simfile = ROOT.TFile("bonsai_reqs/wcsim.root")
 simtree = simfile.Get("wcsimGeoT")
+
 geotree = None
 for geoevent in simtree:
     geotree = geoevent.wcsimrootgeom
@@ -211,7 +183,7 @@ vertex = {
 "x": [],
 "y": [],
 "z": [],
-"t_vertex_rel": [],
+"result0": [],
 "result1": [],
 "result2": [],
 "result3": [],
@@ -219,14 +191,13 @@ vertex = {
 "result5": [],
 "good0":[],
 "good1":[],
-"good2":[],
-"t_vertex_abs":[] 
+"good2":[] 
 }
 
-for df in tqdm(events, total=len(events)):
-    # count += 1    
-    # if count > 5000: break
-    # print(count)
+for df in events:
+    count += 1    
+    if count > 1000: break
+    print(count)
 
     # Generate hit_collection from event
     sub = data[data.event_id == df]
@@ -235,10 +206,7 @@ for df in tqdm(events, total=len(events)):
     # Run a moving average 50ns hit filter
     tstart = mvwindow_start 
     tend   = tstart + mvwindow_width
-    try:
-        tmax = np.max(hits_df.t)
-    except:
-        print(df)
+    tmax   = np.max(hits_df.t)
     
     while tend < tmax:
         
@@ -276,7 +244,7 @@ for df in tqdm(events, total=len(events)):
         vertex["x"].append(bsVertex[0])
         vertex["y"].append(bsVertex[1])
         vertex["z"].append(bsVertex[2])
-        vertex["t_vertex_rel"].append(bsResult[0])
+        vertex["result0"].append(bsResult[0])
         vertex["result1"].append(bsResult[1])
         vertex["result2"].append(bsResult[2])
         vertex["result3"].append(bsResult[3])
@@ -285,7 +253,6 @@ for df in tqdm(events, total=len(events)):
         vertex["good0"].append(bsGood[0])
         vertex["good1"].append(bsGood[1])
         vertex["good2"].append(bsGood[2])
-        vertex["t_vertex_abs"].append(bsResult[0] + np.min(window.t) - 200)
         
         # Skip to next window if we found a hit
         tstart += mvwindow_width
@@ -295,4 +262,4 @@ for key in vertex:
     print(key, len(vertex[key]))
     
 df = pd.DataFrame(vertex)
-df.to_csv(output_dir)
+df.to_csv(f"df_noSpill_vertex_{runno}.csv")

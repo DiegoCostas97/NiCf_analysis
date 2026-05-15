@@ -1,0 +1,65 @@
+slurmstepd: info: Setting TMPDIR to /scratch/6853437. Previous errors about TMPDIR can be discarded
+Loading DataFrames...
+
+Computing pure signal (tRMS < 2.0 ns)...
+  Run 1769 (0.0, 51.2, 1175.8): 69642 pure candidates
+  Run 1767 (0, 1525, 0): 117670 pure candidates
+
+Computing MC acceptance...
+
+Generating plots...
+
+--- Acceptance Summary ---
+  Run 1769 (0.0, 51.2, 1175.8): 69642 pure candidates
+  Run 1767 (0, 1525, 0): 117670 pure candidates
+  PMTs with valid acceptance: 1534 / 2014
+  Mean data acceptance: 2.833 ± 7.739
+  Mean MC acceptance:   2.288 ± 2.842
+
+Saved to /mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/nicf_data/data/analysis_files/final_pipeline_claude/angular_1769_vs_1767/angular_acceptance.csv
+Done!
+Loading DataFrames...
+
+Computing pure signal (tRMS < 2.0 ns)...
+  Run 1769 (0.0, 51.2, 1175.8): 69642 pure candidates
+  Run 2336 (0, -441, 563): 93537 pure candidates
+
+Computing MC acceptance...
+
+Generating plots...
+
+--- Acceptance Summary ---
+  Run 1769 (0.0, 51.2, 1175.8): 69642 pure candidates
+  Run 2336 (0, -441, 563): 93537 pure candidates
+  PMTs with valid acceptance: 1509 / 2014
+  Mean data acceptance: 1.937 ± 3.189
+  Mean MC acceptance:   1.713 ± 1.507
+
+Saved to /mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/nicf_data/data/analysis_files/final_pipeline_claude/angular_1769_vs_2336/angular_acceptance.csv
+Done!
+
+*****************************************************************************
+*                                                                           *
+*                    JOB EFFICIENCY REPORT (seff 6853437)                   *
+*                                                                           *
+*****************************************************************************
+
+Job ID: 6853437
+Cluster: finisterrae3
+User/Group: usciedcr/usc
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:00:09
+CPU Efficiency: 81.82% of 00:00:11 core-walltime
+Job Wall-clock time: 00:00:11
+Memory Utilized: 84.00 KB
+Memory Efficiency: 0.00% of 16.00 GB
+
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ ++   Memory Efficiency is too small. Please review the requested memory. ++
+ ++ It seems that you do not need that much memory so we recommend        ++
+ ++ requesting less memory in other similar jobs.                         ++
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 
+*****************************************************************************
+
