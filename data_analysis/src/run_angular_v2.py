@@ -449,9 +449,10 @@ for row, (run_a, run_b) in enumerate(run_pairs):
         mask = valid & (pmt_category == cat)
         vals = double_ratio[mask]
         if len(vals) > 0:
+            vals_clipped = vals[(vals >= 0) & (vals <= 3)]
             ax2.hist(vals, bins=50, range=(0, 3), histtype="step",
                      color=color, linewidth=1.5,
-                     label=f"{cat} ($\\mu$={vals.mean():.2f}, $\\sigma$={vals.std():.2f})")
+                     label=f"{cat} (μ={vals_clipped.mean():.2f}, σ={vals_clipped.std():.2f})")
     
     ax2.axvline(1.0, linestyle=":", color="k")
     ax2.set_xlabel("$\\eta_i / \\tilde{\\eta}_i$")

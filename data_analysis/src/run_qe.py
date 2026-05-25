@@ -124,9 +124,9 @@ def main():
     print(f"  BKG: {df_bkg['candidate_id'].nunique()} candidates")
 
     # ─── 2. Data: select common events, apply tRMS cut, subtract BKG ───
-    print(f"\nApplying tRMS < {args.trms_cut} ns cut to data...")
-    df_sig_cut = df_sig[df_sig["trms"] < args.trms_cut]
-    df_bkg_cut = df_bkg[df_bkg["trms"] < args.trms_cut]
+    print(f"\nApplying tRMS < {args.trms_cut} ns and nhits <= 50 cuts to data...")
+    df_sig_cut = df_sig[(df_sig["trms"] < args.trms_cut) & (df_sig["nhits"] <= 50)]
+    df_bkg_cut = df_bkg[(df_bkg["trms"] < args.trms_cut) & (df_bkg["nhits"] <= 50)]
 
     # Select common events between SIG and BKG for valid subtraction
     common_events = np.intersect1d(
@@ -171,9 +171,9 @@ def main():
     )
     print(f"  {len(df_mc_cands)} MC candidates found")
 
-    df_mc_cands_cut = df_mc_cands[df_mc_cands["trms"] < args.trms_cut]
+    df_mc_cands_cut = df_mc_cands[(df_mc_cands["trms"] < args.trms_cut) & (df_mc_cands["nhits"] <= 50)]
     n_cands_mc = len(df_mc_cands_cut)
-    print(f"  After tRMS < {args.trms_cut} ns: {n_cands_mc} MC candidates")
+    print(f"  After tRMS < {args.trms_cut} ns and nhits <= 50: {n_cands_mc} MC candidates")
 
     # Map MC PMTs to pmt_ids
     tube_mapping = load_wcsim_tube_mapping(args.geo_file)

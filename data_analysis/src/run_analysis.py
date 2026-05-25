@@ -112,27 +112,78 @@ def plot_nhits_and_duration(sig_times, bkg_times, fig_dir):
     plt.close()
 
 
-def plot_trms(sig_times, bkg_times, fig_dir):
-    """tRMS distributions for various hit ranges."""
+def plot_trms(sig_times, bkg_times, sig_times_raw, bkg_times_raw, fig_dir):
+    """tRMS distributions with and without ToF correction."""
     trms_sig, trms_bkg = [], []
     for evC in sig_times.values():
-        for c in evC:
-            trms_sig.append(np.std(c))
+        for c in evC: trms_sig.append(np.std(c))
     for evC in bkg_times.values():
-        for c in evC:
-            trms_bkg.append(np.std(c))
+        for c in evC: trms_bkg.append(np.std(c))
+
+    trms_sig_raw, trms_bkg_raw = [], []
+    for evC in sig_times_raw.values():
+        for c in evC: trms_sig_raw.append(np.std(c))
+    for evC in bkg_times_raw.values():
+        for c in evC: trms_bkg_raw.append(np.std(c))
 
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.hist(trms_sig, bins=500, range=(0, 10), histtype="step",
-            color="black", linewidth=1.5, 
-            label=f"SIG+BKG ($\\mu$={np.mean(trms_sig):.2f} ns)")
+            color="black", linewidth=1.5,
+            label=f"SIG+BKG ToF-corr ($\\mu$={np.mean(trms_sig):.2f} ns)")
     ax.hist(trms_bkg, bins=500, range=(0, 10), histtype="step",
-            color="blue", linewidth=1.5, 
-            label=f"BKG ($\\mu$={np.mean(trms_bkg):.2f} ns)")
+            color="blue", linewidth=1.5,
+            label=f"BKG ToF-corr ($\\mu$={np.mean(trms_bkg):.2f} ns)")
+    ax.hist(trms_sig_raw, bins=500, range=(0, 10), histtype="step",
+            color="gray", linewidth=1.5, linestyle="--",
+            label=f"SIG+BKG raw ($\\mu$={np.mean(trms_sig_raw):.2f} ns)")
+    ax.hist(trms_bkg_raw, bins=500, range=(0, 10), histtype="step",
+            color="lightblue", linewidth=1.5, linestyle="--",
+            label=f"BKG raw ($\\mu$={np.mean(trms_bkg_raw):.2f} ns)")
     ax.set_xlabel("$t_{RMS}$ [ns]"); ax.set_ylabel("Candidates")
     ax.legend(); ax.grid(True)
     plt.tight_layout()
     plt.savefig(os.path.join(fig_dir, "trms.png"), dpi=150)
+    plt.close()
+
+    # ─── Second plot: fit gaussian to SIG+BKG peak ───
+    from scipy.optimize import curve_fit
+    from scipy.stats import norm
+
+    def gaussian(x, A, mu, sigma):
+        return A * np.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+    counts, edges = np.histogram(trms_sig, bins=500, range=(0, 10))
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    
+    # Fit around the peak
+    peak_idx = np.argmax(counts)
+    peak_x = centers[peak_idx]
+    fit_mask = (centers > max(0, peak_x - 0.6)) & (centers < peak_x + 0.6)
+
+    try:
+        popt, _ = curve_fit(gaussian, centers[fit_mask], counts[fit_mask],
+                            p0=[counts[peak_idx], peak_x, 0.3])
+        mu_fit, sigma_fit = popt[1], abs(popt[2])
+    except Exception:
+        mu_fit, sigma_fit = peak_x, np.nan
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.hist(trms_sig, bins=500, range=(0, 10), histtype="step",
+            color="black", linewidth=1.5,
+            label=f"SIG+BKG (peak $\\mu$={mu_fit:.2f} ns, $\\sigma$={sigma_fit:.2f})")
+    ax.hist(trms_bkg, bins=500, range=(0, 10), histtype="step",
+            color="blue", linewidth=1.5,
+            label=f"BKG ($\\mu$={np.mean(trms_bkg):.2f} ns)")
+
+    # Draw fit
+    x_fit = np.linspace(max(0, mu_fit - 3*sigma_fit), mu_fit + 3*sigma_fit, 200)
+    ax.plot(x_fit, gaussian(x_fit, *popt), color="red", linewidth=1.5,
+            label="Gaussian fit to SIG+BKG peak")
+
+    ax.set_xlabel("$t_{RMS}$ [ns]"); ax.set_ylabel("Candidates")
+    ax.legend(); ax.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(fig_dir, "trms_fitted.png"), dpi=150)
     plt.close()
 
 
@@ -337,6 +388,13 @@ def main():
                         args.n_parts, tof_map=None if args.no_tof else tof_map)
     print(f"  {len(bkg_data['hit_times'])} events read")
 
+    # ─── 3b. Read RAW data (without ToF) for tRMS comparison ───
+    print(f"\nReading RAW data (no ToF) for tRMS comparison plot...")
+    sig_data_raw = read_run(args.sig_run, sig_files, sig_parts,
+                            args.n_parts, tof_map=None)
+    bkg_data_raw = read_run(args.bkg_run, bkg_files, bkg_parts,
+                            args.n_parts, tof_map=None)
+
     # ─── 4. Run trigger ───
     print(f"\nRunning greedy nHits trigger (w={args.window} ns, "
           f"thresh_min={args.thresh_min})...")
@@ -350,10 +408,20 @@ def main():
         bkg_data['hit_times'], args.window, args.thresh_min
     )
 
+    # Trigger on raw times (for tRMS comparison)
+    print("  SIG+BKG raw...")
+    _, sig_times_raw, _ = nHits_greedy(
+        sig_data_raw['hit_times'], args.window, args.thresh_min
+    )
+    print("  BKG raw...")
+    _, bkg_times_raw, _ = nHits_greedy(
+        bkg_data_raw['hit_times'], args.window, args.thresh_min
+    )
+
     # ─── 5. Plots (no cuts) ───
     print("\nGenerating plots (no cuts)...")
     plot_nhits_and_duration(sig_times, bkg_times, fig_dir)
-    plot_trms(sig_times, bkg_times, fig_dir)
+    plot_trms(sig_times, bkg_times, sig_times_raw, bkg_times_raw, fig_dir)    
     plot_tc(sig_times, bkg_times, fig_dir)
     plot_nhits_vs_trms_2d(sig_times, bkg_times, fig_dir)
 
